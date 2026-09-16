@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 from pptx import Presentation
 from pptx.util import Inches, Pt
-from pptx.dml.color import RgbColor
+from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
 import io
@@ -13,7 +13,7 @@ import json
 from datetime import datetime, timedelta
 
 # ================== CONFIGURACIÓN ==================
-TOKEN = os.getenv("MTU0ODk0OTc3ODI5MTg4ODE3MQ.GQ2VDR.RLT-HuQc8HroJz8aFp0j4pyYaI0tDbBnvlHYew")
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 CANAL_CHISTES   = 1549214401830322186
 CANAL_POEMAS    = 1544141490152931479
@@ -45,9 +45,6 @@ def guardar_datos(data):
 
 def calcular_nivel(xp):
     return int((xp ** 0.5) / 2)
-
-def xp_para_siguiente(nivel):
-    return ((nivel + 1) * 2) ** 2
 
 cooldown_xp = {}
 
@@ -123,17 +120,16 @@ async def on_message(message):
             if canal:
                 await canal.send(f"🎉 ¡Felicidades {message.author.mention}! Has subido al **nivel {nuevo_nivel}**!")
 
-    # --- Calificar arte en el canal de Re:Zero ---
+    # --- Calificar arte ---
     if message.channel.id == CANAL_ARTE and message.attachments:
         for att in message.attachments:
             if att.content_type and att.content_type.startswith("image/"):
-                calificacion = random.choice(calificaciones_arte)
-                await message.reply(calificacion)
+                await message.reply(random.choice(calificaciones_arte))
                 break
 
     await bot.process_commands(message)
 
-# ========== TAREAS AUTOMÁTICAS ==========
+# ========== TAREAS ==========
 @tasks.loop(minutes=10)
 async def enviar_chistes():
     canal = bot.get_channel(CANAL_CHISTES)
@@ -144,8 +140,7 @@ async def enviar_chistes():
 async def enviar_poemas():
     canal = bot.get_channel(CANAL_POEMAS)
     if canal:
-        poema = random.choice(poemas)
-        await canal.send(f"📜 **Poema del momento:**\n\n{poema}")
+        await canal.send(f"📜 **Poema del momento:**\n\n{random.choice(poemas)}")
 
 @tasks.loop(minutes=30)
 async def enviar_info():
@@ -155,20 +150,13 @@ async def enviar_info():
 
     guild = canal.guild
     online = sum(1 for m in guild.members if m.status != discord.Status.offline)
-    total = guild.member_count
     data = cargar_datos()
-    mensajes = data.get("mensajes_totales", 0)
 
-    embed = discord.Embed(
-        title="📊 Estado del Servidor",
-        color=discord.Color.green(),
-        timestamp=datetime.utcnow()
-    )
-    embed.add_field(name="👥 Miembros totales", value=str(total), inline=True)
+    embed = discord.Embed(title="📊 Estado del Servidor", color=discord.Color.green(), timestamp=datetime.utcnow())
+    embed.add_field(name="👥 Miembros totales", value=str(guild.member_count), inline=True)
     embed.add_field(name="🟢 En línea", value=str(online), inline=True)
-    embed.add_field(name="💬 Mensajes totales (desde que el bot está activo)", value=str(mensajes), inline=False)
-    embed.set_footer(text="Actualización automática cada 30 minutos")
-
+    embed.add_field(name="💬 Mensajes totales", value=str(data.get("mensajes_totales", 0)), inline=False)
+    embed.set_footer(text="Actualización cada 30 minutos")
     await canal.send(embed=embed)
 
 # ========== COMANDOS ==========
@@ -189,7 +177,7 @@ async def nivel(interaction: discord.Interaction):
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="ranking", description="Top de niveles del servidor")
+@bot.tree.command(name="ranking", description="Top de niveles")
 async def ranking(interaction: discord.Interaction):
     data = cargar_datos()
     niveles = data.get("niveles", {})
@@ -212,10 +200,9 @@ async def ranking(interaction: discord.Interaction):
 
 @bot.tree.command(name="poema", description="Te envía un poema aleatorio")
 async def poema_cmd(interaction: discord.Interaction):
-    poema = random.choice(poemas)
-    await interaction.response.send_message(f"📜 **Poema para ti:**\n\n{poema}")
+    await interaction.response.send_message(f"📜 **Poema para ti:**\n\n{random.choice(poemas)}")
 
-@bot.tree.command(name="plantilla", description="Genera una plantilla de presentación PowerPoint")
+@bot.tree.command(name="plantilla", description="Genera una plantilla de presentación")
 @app_commands.describe(titulo="Título de la presentación")
 async def plantilla(interaction: discord.Interaction, titulo: str = "Plantilla de Presentación"):
     await interaction.response.defer()
@@ -230,10 +217,11 @@ def crear_plantilla(titulo: str = "Plantilla de Presentación", autor: str = "Di
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
-    azul_oscuro = RgbColor(15, 32, 64)
-    azul = RgbColor(37, 99, 235)
-    gris = RgbColor(100, 116, 139)
-    blanco = RgbColor(255, 255, 255)
+
+    azul_oscuro = RGBColor(15, 32, 64)
+    azul = RGBColor(37, 99, 235)
+    gris = RGBColor(100, 116, 139)
+    blanco = RGBColor(255, 255, 255)
 
     def agregar_fondo(slide, color):
         shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
@@ -252,6 +240,7 @@ def crear_plantilla(titulo: str = "Plantilla de Presentación", autor: str = "Di
         p.font.color.rgb = color
         p.alignment = align
 
+    # Portada
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     agregar_fondo(slide, azul_oscuro)
     barra = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, Inches(2.8), Inches(13.333), Inches(0.15))
@@ -259,14 +248,16 @@ def crear_plantilla(titulo: str = "Plantilla de Presentación", autor: str = "Di
     barra.fill.fore_color.rgb = azul
     barra.line.fill.background()
     agregar_texto(slide, 0.8, 2.2, 11.5, 1, titulo, size=40, bold=True, color=blanco, align=PP_ALIGN.CENTER)
-    agregar_texto(slide, 0.8, 3.2, 11.5, 0.6, f"Creado por {autor}", size=18, color=RgbColor(180, 200, 255), align=PP_ALIGN.CENTER)
+    agregar_texto(slide, 0.8, 3.2, 11.5, 0.6, f"Creado por {autor}", size=18, color=RGBColor(180, 200, 255), align=PP_ALIGN.CENTER)
 
+    # Índice
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     agregar_fondo(slide, blanco)
     agregar_texto(slide, 0.8, 0.4, 11, 0.8, "Índice", size=32, bold=True, color=azul_oscuro)
     for i, tema in enumerate(["1. Introducción", "2. Objetivos", "3. Desarrollo", "4. Puntos clave", "5. Conclusiones", "6. Cierre"]):
         agregar_texto(slide, 1.2, 1.5 + i * 0.7, 10, 0.6, tema, size=22, color=gris)
 
+    # Contenido
     for titulo_sec, contenido in [
         ("Introducción", "Escribe aquí la introducción.\n\n• Punto 1\n• Punto 2\n• Punto 3"),
         ("Objetivos", "• Objetivo 1\n• Objetivo 2\n• Objetivo 3"),
@@ -282,11 +273,13 @@ def crear_plantilla(titulo: str = "Plantilla de Presentación", autor: str = "Di
         agregar_texto(slide, 0.8, 0.3, 11, 0.7, titulo_sec, size=28, bold=True, color=blanco)
         agregar_texto(slide, 0.8, 1.6, 11.5, 4.5, contenido, size=20, color=gris)
 
+    # Conclusión
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     agregar_fondo(slide, blanco)
     agregar_texto(slide, 0.8, 0.4, 11, 0.8, "Conclusiones", size=32, bold=True, color=azul_oscuro)
     agregar_texto(slide, 0.8, 1.6, 11.5, 4, "• Resumen\n• Mensaje final\n• Próximos pasos\n\n¡Gracias!", size=20, color=gris)
 
+    # Cierre
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     agregar_fondo(slide, azul_oscuro)
     agregar_texto(slide, 0.8, 2.8, 11.5, 1, "¡Gracias!", size=44, bold=True, color=blanco, align=PP_ALIGN.CENTER)
